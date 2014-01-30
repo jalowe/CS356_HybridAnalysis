@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="javato" default="usage">
+    <taskdef resource="net/sf/antcontrib/antlib.xml">
+        <classpath>
+            <pathelement location="lib/ant-contrib.jar"/>
+        </classpath>
+    </taskdef>
+    <property name="javato.home.dir" location="."/>
+    <property name="benchdir" location="src/benchmarks"/>
+    <property name="javabenchdir" location="../java_bench"/>
+    <property name="tmpdir" location="./tmp"/>
+
+    <target name="clean">
+        <!--
+              Required poperties:
+                  javato.work.dir
+          -->
+        <fail unless="javato.work.dir"/>
+        <delete dir="${tmpdir}"/>
+        <delete dir="${javato.work.dir}/tmpclasses"/>
+        <delete dir="${javato.work.dir}/tmpbootclasses"/>
+        <delete file="${javato.work.dir}/javato.usedids"/>
+        <delete file="${javato.work.dir}/iidToLine.map"/>
+        <delete file="${javato.work.dir}/iidToLine.map.html"/>
+        <delete file="${javato.work.dir}/error.log"/>
+        <delete file="${javato.work.dir}/error.list"/>
+        <delete file="${javato.work.dir}/error.stat"/>
+        <delete file="${javato.work.dir}/error.time"/>
+        <delete file="${javato.work.dir}/atomicity_data.out"/>
+        <delete file="${javato.work.dir}/execs"/>
+    </target>
+
+    <target name="cleanall">
+      <delete>
+        <fileset dir="${javato.home.dir}">
+          <include name="**/tmpclasses/**"/>
+          <include name="**/tmpbootclasses/**"/>
+          <include name="**/javato.usedids"/>
+          <include name="**/iidToLine.map"/>
+          <include name="**/iidToLine.map.html"/>
+          <include name="**/error.log"/>
+          <include name="**/error.list"/>
+          <include name="**/error.stat"/>
+          <include name="**/error.time"/>
+          <include name="**/atomicity_data.out"/>
+          <include name="**/execs"/>
+        </fileset>
+      </delete>
+    </target>
+
+    <target name="instr" description="run instrumentor" depends="clean">
+        <!--
+              Required poperties:
+                  javato.work.dir
+                  javato.app.main.class
+              Optional properties:
+                  javato.app.instr.dir
+                  javato.app.class.path
+                  javato.app.boot.list
+                  javato.instops
+          -->
+        <mkdir dir="${tmpdir}"/>
+        <fail unless="javato.work.dir"/>
+        <fail unless="javato.app.main.class"/>
+        <property name="javato.app.instr.dir" value=""/>
+        <property name="javato.app.class.path" value=""/>
+        <property name="javato.app.boot.list" value=""/>
+        <property name="javato.instops" value="-p jb use-original-names -validate"/>
+        <if>
+            <equals arg1="${javato.app.instr.dir}" arg2=""/>
+            <then>
+                <property name="javato_instops" value="${javato.instops}"/>
+                <path id="javato_app_class_path">
+                    <pathelement path="${javato.app.class.path}"/>
+                </path>
+            </then>
+            <else>
+                <property name="javato_instops"
+                          value="${javato.instops} -process-dir ${javato.app.instr.dir}"/>
+                <path id="javato_app_class_path">
+                    <pathelement location="${javato.app.instr.dir}"/>
+                    <pathelement path="${javato.app.class.path}"/>
+                </path>
+            </else>
+        </if>
+        <java classname="javato.activetesting.instrumentor.InstrumentorForActiveTesting"
+              fork="true" dir="${javato.work.dir}" maxmemory="2048m">
+            <arg value="-keep-line-number"/>
+            <arg line="${javato_instops}"/>
+            <arg value="-no-output-inner-classes-attribute"/>
+            <arg value="-d"/>
+            <arg file="${javato.work.dir}/tmpclasses"/>
+            <arg value="-x"/>
+            <arg value="javato"/>
+            <arg value="-x"/>
+            <arg value="edu.berkeley.cs.detcheck"/>
+            <arg value="--app"/>
+            <arg line="${javato.app.main.class}"/>
+            <syspropertyset>
+                <propertyref builtin="all"/>
+            </syspropertyset>
+            <classpath>
+                <pathelement location="${javato.home.dir}/classes"/>
+                <pathelement location="${javato.home.dir}/lib/sootall-2.3.0.jar"/>
+                <path refid="javato_app_class_path"/>
+            </classpath>
+        </java>
+        <if>
+            <not>
+                <equals arg1="${javato.app.boot.list}" arg2=""/>
+            </not>
+            <then>
+                <mkdir dir="${javato.work.dir}/tmpbootclasses"/>
+                <for param="bootitem" list="${javato.app.boot.list}">
+                    <sequential>
+                        <var name="srcdir"
+                             value="${javato.work.dir}/tmpclasses/@{bootitem}"/>
+                        <var name="dstdir"
+                             value="${javato.work.dir}/tmpbootclasses/@{bootitem}"/>
+                        <mkdir dir="${dstdir}"/>
+                        <move todir="${dstdir}">
+                            <fileset dir="${srcdir}"/>
+                        </move>
+                    </sequential>
+                </for>
+            </then>
+        </if>
+    </target>
+
+    <target name="analysis-once" description="run analysis once">
+        <fail unless="javato.work.dir"/>
+        <fail unless="javato.app.main.class"/>
+        <fail unless="javato.activetesting.analysis.class"/>
+        <property name="javato.app.args" value=""/>
+        <property name="javato.app.class.path" value=""/>
+        <if>
+            <available file="${javato.work.dir}/tmpbootclasses"/>
+            <then>
+                <property name="jvm_args"
+                          value="-ea -Xbootclasspath/p:tmpbootclasses:${javato.home.dir}/classes"/>
+            </then>
+            <else>
+                <property name="jvm_args" value="-ea"/>
+            </else>
+        </if>
+        <stopwatch name="timer" action="start"/>
+        <java classname="${javato.app.main.class}"
+              fork="true" dir="${javato.work.dir}" maxmemory="1024m">
+            <arg line="${javato.app.args}"/>
+            <jvmarg line="${jvm_args}"/>
+            <syspropertyset>
+                <propertyref builtin="all"/>
+            </syspropertyset>
+            <classpath>
+                <pathelement location="${javato.work.dir}/tmpclasses"/>
+                <pathelement path="${javato.app.class.path}"/>
+                <pathelement location="${javato.home.dir}/classes"/>
+            </classpath>
+        </java>
+        <stopwatch name="timer" action="total"/>
+        <echo message="${timer}${line.separator}"
+              file="${javato.work.dir}/error.time" append="true"/>
+    </target>
+
+    <target name="race-analysis" description="Run hybrid race detector">
+        <property name="javato.ignore.methods" value="true"/>
+        <property name="javato.ignore.allocs" value="true"/>
+        <property name="javato.activetesting.trialnum.list" value="1,2,3"/>
+        <property name="javato.activetesting.errorlist.file" value="${javato.work.dir}/error.list"/>
+        <antcall target="instr"/>
+        <antcall target="analysis-once">
+            <param name="javato.activetesting.analysis.class" value="javato.activetesting.HybridAnalysis"/>
+        </antcall>
+    </target>
+
+	<!-- JGFAll from section1 -->
+    <target name="test_JGFAll">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFAll"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFAllSizeA from section2 -->
+    <target name="test_JGFAllSizeA">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFAllSizeA"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFAllSizeB from section2 -->
+    <target name="test_JGFAllSizeB">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFAllSizeB"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFAllSizeC from section2 -->
+    <target name="test_JGFAllSizeC">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFAllSizeC"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFMolDynBenchSizeA from section3 -->
+    <target name="test_JGFMolDynBenchSizeA">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFMolDynBenchSizeA"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFMolDynBenchSizeB from section3 -->
+    <target name="test_JGFMolDynBenchSizeB">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFMolDynBenchSizeB"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFMonteCarloBenchSizeA from section3 -->
+    <target name="test_JGFMonteCarloBenchSizeA">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFMonteCarloBenchSizeA"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFMonteCarloBenchSizeB from section3 -->
+    <target name="test_JGFMonteCarloBenchSizeB">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFMonteCarloBenchSizeB"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFRayTracerBenchSizeA from section3 -->
+    <target name="test_JGFRayTracerBenchSizeA">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFRayTracerBenchSizeA"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+	<!-- JGFRayTracerBenchSizeB from section3 -->
+    <target name="test_JGFRayTracerBenchSizeB">
+        <!--<echo message="3 potential and 3 real races"/>-->
+        <property name="javato.work.dir" value="${benchdir}"/>
+        <property name="javato.app.main.class" value="JGFRayTracerBenchSizeB"/>
+        <antcall target="race-analysis"/>
+    </target>
+	
+    <target name="racefuzzer">
+        <antcall target="test_JGFAll"/>
+		<antcall target="test_JGFAllSizeA"/>
+		<antcall target="test_JGFAllSizeB"/>
+		<antcall target="test_JGFAllSizeC"/>
+		<antcall target="test_JGFMolDynBenchSizeA"/>
+		<antcall target="test_JGFMolDynBenchSizeB"/>
+		<!--<antcall target="test_JGFMonteCarloBenchSizeA"/>
+		<antcall target="test_JGFMonteCarloBenchSizeB"/>-->
+		<antcall target="test_JGFRayTracerBenchSizeA"/>
+		<antcall target="test_JGFRayTracerBenchSizeB"/>
+    </target>
+</project>

@@ -1,0 +1,43 @@
+9
+
+dir
+3143
+svn+ssh://srl.cs.berkeley.edu/projects/calfuzzer/src/benchmarks/determinism/pj/edu/rit/smp
+svn+ssh://srl.cs.berkeley.edu/projects
+
+
+
+2010-02-05T22:16:54.472159Z
+2846
+jburnim
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+87e6b42e-1434-0410-a6c3-37841a2aa69a
+
+ca
+dir
+
+fractal
+dir
+
+keysearch
+dir
+
+monte
+dir
+
+network
+dir
+

@@ -1,0 +1,79 @@
+9
+
+dir
+3143
+svn+ssh://srl.cs.berkeley.edu/projects/calfuzzer/src/benchmarks/detinfer/pj/edu/rit
+svn+ssh://srl.cs.berkeley.edu/projects
+
+
+
+2010-02-12T06:52:20.719874Z
+2888
+jburnim
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+87e6b42e-1434-0410-a6c3-37841a2aa69a
+
+clu
+dir
+
+color
+dir
+
+compbio
+dir
+
+crypto
+dir
+
+draw
+dir
+
+http
+dir
+
+hyb
+dir
+
+image
+dir
+
+io
+dir
+
+mp
+dir
+
+mri
+dir
+
+numeric
+dir
+
+pj
+dir
+
+smp
+dir
+
+swing
+dir
+
+util
+dir
+
+vector
+dir
+
